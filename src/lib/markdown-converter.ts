@@ -28,7 +28,24 @@ function delimitCode(content: string): string {
   const wouldFuse = content.startsWith("`") || content.endsWith("`");
   const parserWouldStripSpaces =
     content.startsWith(" ") && content.endsWith(" ") && content.trim() !== "";
-  const pad = wouldFuse || parserWouldStripSpaces ? " " : "";
+
+  // A trailing BACKSLASH eats the closing tick. CommonMark says there are no
+  // escapes inside a code span, but the inline lexer treats it as one anyway:
+  // the span does not close where it should, every boundary after it shifts,
+  // and a later bold run comes back as literal text. Windows paths do this
+  // (`C:\\Users\\name\\`).
+  //
+  // TWO conditions are required, which is why it resists reproduction: the
+  // trailing backslash AND another code span further along in the same
+  // paragraph. With only one of them nothing happens, so a minimal fixture with
+  // just the backslash reports that all is well.
+  //
+  // Padding fixes it because it separates the backslash from the tick, and the
+  // parser strips the space on the way back.
+  const eatsItsOwnCloser = content.endsWith("\\");
+
+  const pad =
+    wouldFuse || parserWouldStripSpaces || eatsItsOwnCloser ? " " : "";
   return `${delimiter}${pad}${content}${pad}${delimiter}`;
 }
 

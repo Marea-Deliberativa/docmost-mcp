@@ -99,6 +99,68 @@ check(
 );
 check(text(broken) !== text(doc), "negative control: and the text changes too");
 
+// A code span whose content ends in a BACKSLASH breaks the emphasis that comes
+// AFTER it, leaving the `**` as literal text. Windows paths do this.
+//
+// TWO conditions are required, which is why it resists reproduction: the trailing
+// backslash AND another code span further along in the SAME paragraph. With only
+// one of them nothing happens, so a minimal fixture with just the backslash
+// reports that all is well.
+//
+// Careful writing this: neither an ordinary JS string nor String.raw can END in a
+// backslash -- in raw form it escapes the closing backtick too. It has to be built
+// with fromCharCode or join, or the fixture passes green while testing nothing.
+const BSLASH = String.fromCharCode(92);
+const WINPATH = ["C:", "Users", "nico", "tts-pilot", ""].join(BSLASH);
+
+const trailing = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "open " },
+        { type: "text", text: WINPATH, marks: [{ type: "code" }] },
+        { type: "text", text: " and " },
+        { type: "text", text: "drag the file", marks: [{ type: "bold" }] },
+        { type: "text", text: " onto " },
+        { type: "text", text: "script.bat", marks: [{ type: "code" }] },
+        { type: "text", text: " (done)" },
+      ],
+    },
+  ],
+};
+
+const trailingMd = convertProseMirrorToMarkdown(trailing);
+const trailingBack = await roundTrip(trailingMd);
+check(
+  !text(trailingBack).includes("**"),
+  `a path ending in a backslash leaves no literal asterisks further along · md ${JSON.stringify(trailingMd.slice(0, 58))}`,
+);
+check(
+  codeTexts(trailingBack)[0] === WINPATH,
+  `and the path survives with its trailing backslash · ${JSON.stringify(codeTexts(trailingBack)[0])}`,
+);
+check(
+  codeTexts(trailingBack).length === 2,
+  `and both code spans are still two (found ${codeTexts(trailingBack).length})`,
+);
+
+// NEGATIVE CONTROL: strip the padding by hand and require THAT to break.
+const unpadded = trailingMd.replace(TICK + " " + WINPATH + " " + TICK, TICK + WINPATH + TICK);
+check(unpadded !== trailingMd, "negative control: the markdown did carry padding to strip");
+check(
+  text(await roundTrip(unpadded)).includes("**"),
+  "negative control: without the padding the bold DOES come back as literal text",
+);
+
+// And what must not change: a backslash in the MIDDLE triggers nothing.
+const midway = convertProseMirrorToMarkdown(codeDoc("C:" + BSLASH + "dir" + BSLASH + "file"));
+check(
+  midway === TICK + "C:" + BSLASH + "dir" + BSLASH + "file" + TICK,
+  `a backslash in the middle adds no padding · ${JSON.stringify(midway)}`,
+);
+
 console.log("");
 if (failures.length) {
   console.log(`FAILED: ${failures.length} check(s)`);
