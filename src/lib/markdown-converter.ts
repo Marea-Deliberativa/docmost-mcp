@@ -37,8 +37,16 @@ function escapeLineStarts(text: string): string {
   return text
     .split("\n")
     .map((line: string) => {
+      // A backtick fence is only a fence when the rest of the line holds NO
+      // backticks: CommonMark forbids backticks in the info string after a
+      // backtick fence. Without this condition, a code span long enough to need a
+      // three-backtick delimiter gets its delimiter escaped when it opens a
+      // paragraph, which breaks the span. Tilde fences carry no such restriction,
+      // so they are handled separately.
       const fence = /^( {0,3})(`{3,}|~{3,})/.exec(line);
-      if (fence) {
+      const isReallyAFence =
+        fence && (fence[2][0] === "~" || !line.slice(fence[0].length).includes("`"));
+      if (fence && isReallyAFence) {
         const escaped = fence[2]
           .split("")
           .map((c: string) => "\\" + c)

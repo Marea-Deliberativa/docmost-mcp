@@ -126,6 +126,14 @@ for (const [name, t] of Object.entries(innocent)) {
   check(!md.includes(BS), `${name}: gains no backslash · ${JSON.stringify(md)}`);
 }
 
+// A line that opens with backticks is only a FENCE when the rest of it holds no
+// backticks -- CommonMark forbids backticks in the info string after a backtick
+// fence. So this line is an inline code span, not a fence, and escaping it would
+// break the span rather than protect anything.
+const spanNotFence = plain("``` code ``` with `` backticks `` inside");
+const spanMd = convertProseMirrorToMarkdown({ type: "doc", content: [spanNotFence] });
+check(!spanMd.includes(BS), `a backtick run followed by more backticks is NOT escaped as a fence · ${JSON.stringify(spanMd)}`);
+
 // Table cells are the trap: their text sits after `| ` and never starts a line,
 // so a backslash there protects nothing and PRINTS.
 const table = {
